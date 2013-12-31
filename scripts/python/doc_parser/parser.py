@@ -1,150 +1,104 @@
-#!/usr/bin/python
-# coding: utf-8
-import sys, os, datetime, time, re, codecs
+#!/usr/bin/python -tt
+import csv, re, sys, os, datetime, time
 
-# Create list of files.
 file_list = []
-
-# Set path to list of files.
 path = "./source_docs/"
 
-# Open file we will write to, replace it with new data.
-fout = open("./database/b118_extra.csv", "r+")
-fout.seek(0)
-
-# Read each file in the directory.
 for file in [doc for doc in os.listdir(path)
-	# Build list of file names in the directory.
-	if doc.endswith(".txt")]:
-	    file_list.append(file)
+    # Build list of file names in the directory.
+    if doc.endswith(".txt")]:
+        file_list.append(file)
 
-# Return time file was created.
-def modificationDate(filename):
-    t = os.path.getmtime(filename)
-    return datetime.datetime.fromtimestamp(t)
+#setup regular expressions
 
+#dwr: Groundwater Basin Number
+p1 = r"Groundwater Basin Number:\s(\d*-\d*(.)\d*)"
 
-# Count total records.
-totalcount = 0
+#county: County
+p2 = r"County:\s(\w*\s\w*\s\w*)"
 
-# Add cleaned up column headers.
-header = "DWR_,county,surface_area,total_storage,natural_recharge,filetime"
+#surface_area (acres): Surface Area
+p3 = r"Surface Area:\s(\b\d[\d,.]*\b)"
 
-fout.write(header + '\n')
+#total_storage (acre feet):
+p4 = r"total storage capacity.+?(\b\d[\d,.]*\b)|Groundwater Storage Capacity. The total usable storage capacity.+?(\b\d[\d,.]*\b)|Groundwater Storage Capacity. Total storage capacity.+?(\b\d[\d,.]*\b)|Groundwater Storage Capacity. The total storage capacity.+?(\b\d[\d,.]*\b)"
 
-# Read file list.
+#usable_storage (acre feet):
+p5 = r"Groundwater in Storage. The available usable storage.+?(\b\d[\d,.]*\b)|Groundwater in Storage. The usable water in storage.+?(\b\d[\d,.]*\b)"
+#total u(s|se)able storage.+?(\n)(\b\d[\d,.]*\b)
+
+# p6 = r"(?i)natural recharge.+?(\b\d[\d,.]*\b)"
+
+data = []
+
 for i in file_list:
+
+    # create placeholder list
+    row = ["NULL"] * 5
 
     print "Processing file: " + path + i
 
     # Open file
-    f = open(path + i, 'r')
-    filetime = modificationDate(path + i)
+    with open(path + i, "r") as f:
 
-    filecount = 0
-    rowcount = 0
+        lines = f.read()
 
-    # Read each row, perform cleanup functions.
-    for row in f:
-        
-        # @TODO Properly escape empty files. Deleted no data files from the directory for now.
-        if row != '':
-
-        	# Remove whitespace
-            # row = row.strip()
-    
-            # Create placeholder names for columnn header rows.
-            if rowcount == 0:
-                DWR_ = "DWR_"
-                county = "county"
-                surface_area = "surface_area"
-                total_storage = "total_storage"      
-                natural_recharge = "natural_recharge"
-
-
-            else:
-
-			#ground water basin number: DWR_
-			r1 = re.search(r"Groundwater Basin Number:\s(\d*-\d*(.)\d*)", row)
-
-			if r1 == None:
-				DWR_ = "null"
-
-			elif r1.group(1) != None:
-				DWR_ = r1.group(1)
-
-
-			#county
-			r2 = re.search(r"County:\s(\w*\s\w*\s\w*)", row)
-
-			if r2 == None:
-				county = "null"
-
-			elif r2.group(1) != None:
-				county = r2.group(1)
-
-
-			#surface_area
-			r3 = re.search(r"Surface Area:\s(\d(,*)\d*)", row)
-
-			if r3 == None:
-			  surface_area = "null"
-
-			elif r3.group(1) != None:
-				surface_area = r3.group(1)
-
-
-			#ground water storage capacity: total_storage
-			r4 = re.search(r"total storage capacity.+?(\b\d[\d,.]*\b)|total usable groundwater in storage.+?(\b\d[\d,.]*\b)|estimated storage capacity.+?(\b\d[\d,.]*\b)|total usable storage capacity.+?(\b\d[\d,.]*\b)", row)
-
-			if r4 == None:
-			  total_storage = "null"
-
-			elif r4.group(1) != None:
-				total_storage = r4.group(1)
-
-			elif r4.group(2) != None:
-				total_storage = r4.group(2)
-
-			elif r4.group(3) != None:
-				total_storage = r4.group(3)
-
-			elif r4.group(4) != None:
-				total_storage = r4.group(4)
-
-			elif r4.group(5) != None:
-				total_storage = r4.group(5)
-
-			#natural recharge: natural_recharge
-			r5 = re.search(r"(?i)natural recharge.+?(\b\d[\d,.]*\b)", row)
-
-			if r5 == None:
-				natural_recharge = "null"
-			elif r5.group(1) != None:
-				natural_recharge = r5.group(1)
-
-
-            # Build row.
-            row = str(DWR_) + "," + county + "," + surface_area + "," + total_storage + "," + natural_recharge + "," + str(filetime)
+        m1 = re.search(p1,lines,re.S)    
+        if m1:
+            row.pop(0)
+            row.insert(0,m1.group(1))
             
-            # Resplit row, clean up columns, add date facets.
-            row_nl = row + "\n"
+        m2 = re.search(p2,lines,re.S)
+        if m2:
+            row.pop(1)
+            row.insert(1,m2.group(1))
 
-            # Write row to output file.
-            if filecount != 0:
-                if rowcount != 0:
-                    fout.write(row_nl)
+        m3 = re.search(p3,lines,re.S)
+        if m3:
+            row.pop(2)
+            row.insert(2,m3.group(1))
 
-            rowcount = rowcount + 1
-            totalcount = totalcount + 1
-        filecount = filecount + 1
+        m4 = re.search(p4,lines,re.S)
+        if m4:
+            row.pop(3)
 
-fout.truncate()
-fout.close()
-print "Done. Processed " + str(totalcount) + " records."
+            if m4.group(1) != ('' or None):
+                row.insert(3,m4.group(1))
 
-# Then run this
-# Convert to geoJSON
-# csvjson --lat latitude --lon longitude --k well --crs EPSG:4269 -i 4 ../../database/casgem_timeseries.csv > ../../database/casgem_timeseries.json
+            elif m4.group(2) != ('' or None):
+                row.insert(3,m4.group(2))
 
-sys.exit()
+            elif m4.group(3) != ('' or None):
+                row.insert(3,m4.group(3))
+            
+            elif m4.group(4) != ('' or None):
+                row.insert(3,m4.group(4))
+
+            # else: row.insert(3,m4.group(3))
+
+        else:
+            row.insert(3,"NA")
+
+        m5 = re.search(p5,lines,re.S)
+        if m5:
+            row.pop(4)
+            
+            if m5.group(1) != ('' or None):
+                row.insert(4,m5.group(1))
+
+            else: row.insert(4,m5.group(2))
+    
+        else:
+            row.insert(4,"NA")
+
+        # m6 = re.search(p6,line,re.S)
+        # if m6:
+        #     row.pop(5)
+        #     row.insert(5,m6.group(1))
+
+    data.append(row)
+
+    with open("./database/b118_extra.csv", "w") as f:
+        w = csv.writer(f)
+        w.writerow("dwr county surface_area total_storage usable_storage".split())
+        w.writerows(data)
